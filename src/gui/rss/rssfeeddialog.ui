@@ -27,13 +27,35 @@
       <widget class="QLineEdit" name="textFeedURL"/>
      </item>
      <item row="1" column="0">
+      <widget class="QLabel" name="labelFeedName">
+       <property name="text"><string>Name:</string></property>
+      </widget>
+     </item>
+     <item row="1" column="1">
+      <widget class="QLineEdit" name="textFeedName">
+       <property name="placeholderText"><string>Optional subscription name</string></property>
+      </widget>
+     </item>
+     <item row="3" column="0" colspan="2">
+      <widget class="QCheckBox" name="checkNamePath">
+       <property name="text"><string>Save new downloads in a folder named after this feed</string></property>
+       <property name="checked"><bool>true</bool></property>
+      </widget>
+     </item>
+     <item row="4" column="0" colspan="2">
+      <widget class="QLabel" name="labelSavePath">
+       <property name="wordWrap"><bool>true</bool></property>
+       <property name="text"><string/></property>
+      </widget>
+     </item>
+     <item row="2" column="0">
       <widget class="QLabel" name="labelRefreshInterval">
        <property name="text">
         <string>Refresh interval:</string>
        </property>
       </widget>
      </item>
-     <item row="1" column="1">
+     <item row="2" column="1">
       <widget class="QSpinBox" name="spinRefreshInterval">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">

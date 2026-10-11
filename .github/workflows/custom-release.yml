@@ -1,0 +1,186 @@
+name: Custom Windows Release
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 20 * * *'
+  push:
+    branches: ['custom/rss-feed-path']
+permissions:
+  contents: write
+concurrency:
+  group: custom-windows-release
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    strategy:
+      matrix:
+        libtorrent:
+          - version: "2.0.11"
+            boost_major_version: "1"
+            boost_minor_version: "90"
+            boost_patch_version: "0"
+        config:
+          - arch: x64
+            qt_arch: win64_msvc2022_64
+    env:
+      GH_TOKEN: ${{ github.token }}
+      boost_path: ${{ github.workspace }}/../boost
+      libtorrent_path: ${{ github.workspace }}/../libtorrent
+      vcpkg_path: c:/vcpkg
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: custom/rss-feed-path
+          fetch-depth: 0
+      - name: Prepare official stable release
+        id: prepare
+        run: ./custom/prepare.ps1
+      - if: steps.prepare.outputs.build == 'true'
+        name: Setup devcmd
+        uses: TheMrMilchmann/setup-msvc-dev@v4
+        with:
+          arch: ${{ matrix.config.arch }}
+
+      - if: steps.prepare.outputs.build == 'true'
+        name: Install build tools
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          if ((Get-Command "ninja.exe" -ErrorAction SilentlyContinue) -eq $null)
+          {
+             choco install ninja
+          }
+          where.exe ninja
+          ninja --version
+
+      # https://learn.microsoft.com/en-us/vcpkg/users/binarycaching#gha
+      - if: steps.prepare.outputs.build == 'true'
+        name: Set variables for vcpkg
+        uses: actions/github-script@v8
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', (process.env.ACTIONS_CACHE_URL || ''));
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', (process.env.ACTIONS_RUNTIME_TOKEN || ''));
+
+      - if: steps.prepare.outputs.build == 'true'
+        name: Install dependencies with vcpkg
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          # create our own triplet
+          New-Item `
+            -Force `
+            -ItemType File `
+            -Path "${{ env.vcpkg_path }}/triplets_overlay/${{ matrix.config.arch }}-windows-static-md-release.cmake"
+          # OpenSSL isn't compatible with `/guard:cf` flag so we omit it for now, see: https://github.com/openssl/openssl/issues/22554
+          Add-Content `
+            -Path "${{ env.vcpkg_path }}/triplets_overlay/${{ matrix.config.arch }}-windows-static-md-release.cmake" `
+            -Value @("set(VCPKG_TARGET_ARCHITECTURE ${{ matrix.config.arch }})",
+              "set(VCPKG_LIBRARY_LINKAGE static)",
+              "set(VCPKG_CRT_LINKAGE dynamic)",
+              "set(VCPKG_BUILD_TYPE release)")
+          # clear buildtrees after each package installation to reduce disk space requirements
+          $packages = `
+            "boost-build:${{ matrix.config.arch }}-windows-static-md-release",
+            "openssl:${{ matrix.config.arch }}-windows-static-md-release",
+            "zlib:${{ matrix.config.arch }}-windows-static-md-release"
+          ${{ env.vcpkg_path }}/vcpkg.exe upgrade `
+            --no-dry-run `
+            --overlay-triplets="${{ env.vcpkg_path }}/triplets_overlay"
+          ${{ env.vcpkg_path }}/vcpkg.exe install `
+            --binarysource="clear;x-gha,readwrite" `
+            --clean-after-build `
+            --overlay-triplets="${{ env.vcpkg_path }}/triplets_overlay" `
+            $packages
+
+      - if: steps.prepare.outputs.build == 'true'
+        name: Install boost
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $boost_url="https://archives.boost.io/release/${{ matrix.libtorrent.boost_major_version }}.${{ matrix.libtorrent.boost_minor_version }}.${{ matrix.libtorrent.boost_patch_version }}/source/boost_${{ matrix.libtorrent.boost_major_version }}_${{ matrix.libtorrent.boost_minor_version }}_${{ matrix.libtorrent.boost_patch_version }}.tar.gz"
+          $boost_url2="https://sourceforge.net/projects/boost/files/boost/${{ matrix.libtorrent.boost_major_version }}.${{ matrix.libtorrent.boost_minor_version }}.${{ matrix.libtorrent.boost_patch_version }}/boost_${{ matrix.libtorrent.boost_major_version }}_${{ matrix.libtorrent.boost_minor_version }}_${{ matrix.libtorrent.boost_patch_version }}.tar.gz"
+          curl -L -o "${{ runner.temp }}/boost.tar.gz" "$boost_url"
+          tar -xf "${{ runner.temp }}/boost.tar.gz" -C "${{ github.workspace }}/.."
+          if ($LastExitCode -ne 0)
+          {
+            curl -L -o "${{ runner.temp }}/boost.tar.gz" "$boost_url2"
+            tar -xf "${{ runner.temp }}/boost.tar.gz" -C "${{ github.workspace }}/.."
+          }
+          move "${{ github.workspace }}/../boost_*" "${{ env.boost_path }}"
+          cd "${{ env.boost_path }}"
+          #.\bootstrap.bat
+          ${{ env.vcpkg_path }}/installed/${{ matrix.config.arch }}-windows-static-md-release/tools/boost-build/b2.exe `
+            stage `
+            toolset=msvc `
+            --stagedir=.\ `
+            --with-headers
+
+      - if: steps.prepare.outputs.build == 'true'
+        name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.10.1"
+          arch: ${{ matrix.config.qt_arch }}
+          archives: qtbase qtsvg qttools
+          modules: qtimageformats
+          cache: true
+
+      - if: steps.prepare.outputs.build == 'true'
+        name: Install libtorrent
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          git clone `
+            --branch v${{ matrix.libtorrent.version }} `
+            --depth 1 `
+            --recurse-submodules `
+            https://github.com/arvidn/libtorrent.git `
+            ${{ env.libtorrent_path }}
+          cd ${{ env.libtorrent_path }}
+          $env:CXXFLAGS+=" /guard:cf"
+          $env:LDFLAGS+=" /GUARD:CF"
+          cmake `
+            -B build `
+            -G "Ninja" `
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo `
+            -DCMAKE_CXX_STANDARD=20 `
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON `
+            -DCMAKE_INSTALL_PREFIX="${{ env.libtorrent_path }}/install" `
+            -DCMAKE_TOOLCHAIN_FILE="${{ env.vcpkg_path }}/scripts/buildsystems/vcpkg.cmake" `
+            -DBOOST_ROOT="${{ env.boost_path }}/lib/cmake" `
+            -DBUILD_SHARED_LIBS=OFF `
+            -Ddeprecated-functions=OFF `
+            -Dstatic_runtime=OFF `
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.config.arch }}-windows-static-md-release
+          cmake --build build
+          cmake --install build
+
+      - if: steps.prepare.outputs.build == 'true'
+        name: Build qBittorrent
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $env:CXXFLAGS+="/DQT_FORCE_ASSERTS /WX"
+          cmake `
+            -B build `
+            -G "Ninja" `
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo `
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON `
+            -DCMAKE_TOOLCHAIN_FILE="${{ env.vcpkg_path }}/scripts/buildsystems/vcpkg.cmake" `
+            -DBOOST_ROOT="${{ env.boost_path }}/lib/cmake" `
+            -DLibtorrentRasterbar_DIR="${{ env.libtorrent_path }}/install/lib/cmake/LibtorrentRasterbar" `
+            -DMSVC_RUNTIME_DYNAMIC=ON `
+            -DTESTING=ON `
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.config.arch }}-windows-static-md-release `
+            -DVERBOSE_CONFIGURE=ON `
+            --graphviz=build/target_graph.dot
+          cmake --build build --target qbt_update_translations
+          cmake --build build
+          cmake --build build --target check
+
+      - name: Publish verified custom release
+        if: steps.prepare.outputs.build == 'true'
+        run: ./custom/publish.ps1 -SourceCommit '${{ steps.prepare.outputs.commit }}' -ReleaseTag '${{ steps.prepare.outputs.tag }}' -UpstreamTag '${{ steps.prepare.outputs.upstream }}'

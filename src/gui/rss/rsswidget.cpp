@@ -45,6 +45,7 @@
 #include "base/preferences.h"
 #include "base/rss/rss_article.h"
 #include "base/rss/rss_feed.h"
+#include "base/rss/rss_downloadpath.h"
 #include "base/rss/rss_folder.h"
 #include "base/rss/rss_session.h"
 #include "gui/autoexpandabledialog.h"
@@ -353,10 +354,14 @@ void RSSWidget::on_newFeedButton_clicked()
         const QString feedURL = dialog.feedURL().trimmed();
         const std::chrono::seconds refreshInterval = dialog.refreshInterval();
 
-        const QString feedPath = RSS::Item::joinPath(destFolder->path(), feedURL);
+        const QString name = dialog.feedName();
+        const QString feedPath = RSS::Item::joinPath(destFolder->path(), name.isEmpty() ? feedURL : name);
         const nonstd::expected<RSS::Feed *, QString> result = RSS::Session::instance()->addFeed(feedURL, feedPath, refreshInterval);
         if (result)
+        {
             newFeed = result.value();
+            newFeed->setUseNameAsSavePath(dialog.useNameAsSavePath());
+        }
         else
             QMessageBox::warning(&dialog, u"qBittorrent"_s, result.error(), QMessageBox::Ok);
     }
@@ -452,7 +457,7 @@ void RSSWidget::downloadSelectedTorrents()
             continue;
         }
 
-        app()->addTorrentManager()->addTorrent(torrentURL);
+        app()->addTorrentManager()->addTorrent(torrentURL, RSS::withFeedSavePath({}, article->feed()->defaultSavePath()));
     }
 
     if (badURLCount > 0)
@@ -560,9 +565,23 @@ void RSSWidget::editSelectedRSSFeed()
     auto *dialog = new RSSFeedDialog(this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setFeedURL(rssFeed->url());
+    dialog->setFeedName(rssFeed->name());
+    dialog->setUseNameAsSavePath(rssFeed->useNameAsSavePath());
     dialog->setRefreshInterval(rssFeed->refreshInterval());
     connect(dialog, &RSSFeedDialog::accepted, this, [this, dialog, rssFeed]
     {
+        const QString name = dialog->feedName();
+        if (!name.isEmpty() && (name != rssFeed->name()))
+        {
+            const auto moved = RSS::Session::instance()->moveItem(rssFeed,
+                    RSS::Item::joinPath(RSS::Item::parentPath(rssFeed->path()), name));
+            if (!moved)
+            {
+                QMessageBox::warning(this, u"qBittorrent"_s, moved.error(), QMessageBox::Ok);
+                return;
+            }
+        }
+        rssFeed->setUseNameAsSavePath(dialog->useNameAsSavePath());
         rssFeed->setRefreshInterval(dialog->refreshInterval());
 
         const QString newURL = dialog->feedURL();

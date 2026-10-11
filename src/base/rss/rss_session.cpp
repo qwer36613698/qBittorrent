@@ -362,7 +362,10 @@ bool Session::loadFolder(const QJsonObject &jsonObj, Folder *folder)
 
                 const auto refreshInterval = std::chrono::seconds(valObj[u"refreshInterval"].toInteger());
 
-                addFeedToFolder(uid, valObj[u"url"].toString(), key, folder, refreshInterval);
+                Feed *feed = addFeedToFolder(uid, valObj[u"url"].toString(), key, folder, refreshInterval);
+                feed->blockSignals(true);
+                feed->setUseNameAsSavePath(valObj[u"useNameAsSavePath"].toBool());
+                feed->blockSignals(false);
             }
             else
             {
@@ -460,6 +463,7 @@ void Session::addItem(Item *item, Folder *destFolder)
     if (auto *feed = qobject_cast<Feed *>(item))
     {
         connect(feed, &Feed::titleChanged, this, &Session::handleFeedTitleChanged);
+        connect(feed, &Feed::useNameAsSavePathChanged, this, &Session::store);
         connect(feed, &Feed::iconLoaded, this, &Session::feedIconLoaded);
         connect(feed, &Feed::stateChanged, this, &Session::feedStateChanged);
         connect(feed, &Feed::urlChanged, this, [this, feed](const QString &oldURL)

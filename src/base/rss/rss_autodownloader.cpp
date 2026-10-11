@@ -55,6 +55,7 @@
 #include "rss_article.h"
 #include "rss_autodownloadrule.h"
 #include "rss_feed.h"
+#include "rss_downloadpath.h"
 #include "rss_folder.h"
 #include "rss_session.h"
 
@@ -500,7 +501,9 @@ void AutoDownloader::processJob(const QSharedPointer<ProcessingJob> &job)
             return;
         }
 
-        app()->addTorrentManager()->addTorrent(torrentURL, rule.addTorrentParams());
+        const Feed *sourceFeed = Session::instance()->feedByURL(job->feedURL);
+        const Path feedPath = sourceFeed ? sourceFeed->defaultSavePath() : Path();
+        app()->addTorrentManager()->addTorrent(torrentURL, withFeedSavePath(rule.addTorrentParams(), feedPath));
 
         if (BitTorrent::TorrentDescriptor::parse(torrentURL))
         {

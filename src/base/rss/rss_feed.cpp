@@ -44,6 +44,7 @@
 #include <QUrl>
 
 #include "base/asyncfilestorage.h"
+#include "base/bittorrent/session.h"
 #include "base/global.h"
 #include "base/logger.h"
 #include "base/net/downloadmanager.h"
@@ -52,6 +53,7 @@
 #include "base/utils/fs.h"
 #include "feed_serializer.h"
 #include "rss_article.h"
+#include "rss_downloadpath.h"
 #include "rss_parser.h"
 #include "rss_session.h"
 
@@ -464,6 +466,24 @@ std::chrono::seconds Feed::refreshInterval() const
     return m_refreshInterval;
 }
 
+bool Feed::useNameAsSavePath() const
+{
+    return m_useNameAsSavePath;
+}
+
+void Feed::setUseNameAsSavePath(const bool enabled)
+{
+    if (m_useNameAsSavePath == enabled)
+        return;
+    m_useNameAsSavePath = enabled;
+    emit useNameAsSavePathChanged();
+}
+
+Path Feed::defaultSavePath() const
+{
+    return feedSavePath(BitTorrent::Session::instance()->savePath(), name(), m_useNameAsSavePath);
+}
+
 void Feed::setRefreshInterval(const std::chrono::seconds refreshInterval)
 {
     if (refreshInterval == m_refreshInterval)
@@ -485,6 +505,7 @@ QJsonValue Feed::toJsonValue(const bool withData) const
     QJsonObject jsonObj;
     jsonObj.insert(KEY_UID, uid().toString());
     jsonObj.insert(KEY_URL, url());
+    jsonObj.insert(u"useNameAsSavePath"_s, m_useNameAsSavePath);
     if (refreshInterval() > 0s)
         jsonObj.insert(KEY_REFRESHINTERVAL, static_cast<qint64>(refreshInterval().count()));
 

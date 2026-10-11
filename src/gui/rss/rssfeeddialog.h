@@ -47,11 +47,18 @@ public:
 
     QString feedURL() const;
     void setFeedURL(const QString &feedURL);
+    QString feedName() const;
+    void setFeedName(const QString &name);
+    bool useNameAsSavePath() const;
+    void setUseNameAsSavePath(bool enabled);
+
+    void accept() override;
     std::chrono::seconds refreshInterval() const;
     void setRefreshInterval(std::chrono::seconds refreshInterval);
 
 private:
     void feedURLChanged(const QString &feedURL);
+    void updateSavePathPreview();
 
     Ui::RSSFeedDialog *m_ui = nullptr;
 };

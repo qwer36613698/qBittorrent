@@ -29,6 +29,10 @@
 #include "rssfeeddialog.h"
 
 #include <QPushButton>
+#include <QMessageBox>
+
+#include "base/bittorrent/session.h"
+#include "base/rss/rss_downloadpath.h"
 
 #include "ui_rssfeeddialog.h"
 
@@ -45,10 +49,13 @@ RSSFeedDialog::RSSFeedDialog(QWidget *parent)
 
     // disable Ok button
     m_ui->buttonBox->button(QDialogButtonBox::Ok)->setEnabled(false);
-    connect(m_ui->buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
+    connect(m_ui->buttonBox, &QDialogButtonBox::accepted, this, &RSSFeedDialog::accept);
     connect(m_ui->buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
 
     connect(m_ui->textFeedURL, &QLineEdit::textChanged, this, &RSSFeedDialog::feedURLChanged);
+    connect(m_ui->textFeedName, &QLineEdit::textChanged, this, &RSSFeedDialog::updateSavePathPreview);
+    connect(m_ui->checkNamePath, &QCheckBox::toggled, this, &RSSFeedDialog::updateSavePathPreview);
+    updateSavePathPreview();
 }
 
 RSSFeedDialog::~RSSFeedDialog()
@@ -64,6 +71,43 @@ QString RSSFeedDialog::feedURL() const
 void RSSFeedDialog::setFeedURL(const QString &feedURL)
 {
     m_ui->textFeedURL->setText(feedURL);
+}
+
+QString RSSFeedDialog::feedName() const
+{
+    return m_ui->textFeedName->text().trimmed();
+}
+
+void RSSFeedDialog::setFeedName(const QString &name)
+{
+    m_ui->textFeedName->setText(name);
+}
+
+bool RSSFeedDialog::useNameAsSavePath() const
+{
+    return m_ui->checkNamePath->isChecked() && !feedName().isEmpty();
+}
+
+void RSSFeedDialog::setUseNameAsSavePath(const bool enabled)
+{
+    m_ui->checkNamePath->setChecked(enabled);
+}
+
+void RSSFeedDialog::updateSavePathPreview()
+{
+    const Path basePath = BitTorrent::Session::instance()->savePath();
+    const Path feedPath = RSS::feedSavePath(basePath, feedName(), useNameAsSavePath());
+    m_ui->labelSavePath->setText(tr("New downloads: %1").arg((feedPath.isEmpty() ? basePath : feedPath).toString()));
+}
+
+void RSSFeedDialog::accept()
+{
+    if (useNameAsSavePath() && RSS::feedSavePath(BitTorrent::Session::instance()->savePath(), feedName(), true).isEmpty())
+    {
+        QMessageBox::warning(this, tr("Invalid feed name"), tr("Enter a valid folder name without path separators or reserved characters."));
+        return;
+    }
+    QDialog::accept();
 }
 
 std::chrono::seconds RSSFeedDialog::refreshInterval() const

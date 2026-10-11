@@ -9111,6 +9111,12 @@ Those plugins were disabled.</source>
 </context>
 <context>
     <name>RSSFeedDialog</name>
+    <message><source>Name:</source><translation>訂閱名稱：</translation></message>
+    <message><source>Optional subscription name</source><translation>可自行命名訂閱</translation></message>
+    <message><source>Save new downloads in a folder named after this feed</source><translation>將新下載存入以訂閱名稱命名的資料夾</translation></message>
+    <message><source>New downloads: %1</source><translation>新下載路徑：%1</translation></message>
+    <message><source>Invalid feed name</source><translation>訂閱名稱無法用作資料夾名稱</translation></message>
+    <message><source>Enter a valid folder name without path separators or reserved characters.</source><translation>請輸入有效的資料夾名稱，不可包含路徑分隔符號或保留字元。</translation></message>
     <message>
         <location filename="../gui/rss/rssfeeddialog.ui" line="14"/>
         <source>RSS Feed Options</source>

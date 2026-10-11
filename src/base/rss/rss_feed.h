@@ -88,6 +88,9 @@ namespace RSS
         bool isLoading() const;
         Article *articleByGUID(const QString &guid) const;
         Path iconPath() const;
+        bool useNameAsSavePath() const;
+        void setUseNameAsSavePath(bool enabled);
+        Path defaultSavePath() const;
 
         std::chrono::seconds refreshInterval() const;
         void setRefreshInterval(std::chrono::seconds refreshInterval);
@@ -100,6 +103,7 @@ namespace RSS
         void stateChanged(Feed *feed = nullptr);
         void urlChanged(const QString &oldURL);
         void refreshIntervalChanged(std::chrono::seconds oldRefreshInterval);
+        void useNameAsSavePathChanged();
 
     private slots:
         void handleSessionProcessingEnabledChanged(bool enabled);
@@ -133,6 +137,7 @@ namespace RSS
         QString m_title;
         QString m_lastBuildDate;
         bool m_hasError = false;
+        bool m_useNameAsSavePath = false;
         bool m_isLoading = false;
         bool m_isInitialized = false;
         bool m_pendingRefresh = false;
