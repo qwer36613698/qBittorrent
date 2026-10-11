@@ -32,4 +32,12 @@ $manifest.sha256 = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvaria
 $manifest | ConvertTo-Json | Set-Content custom-update.json -Encoding utf8
 # Fast-forward only: if someone edits the branch during the build, publication stops.
 git push origin 'HEAD:refs/heads/custom/rss-feed-path'
-gh release create $ReleaseTag $archive custom-update.json --repo $env:GITHUB_REPOSITORY --target $SourceCommit --title "qBittorrent $UpstreamTag + RSS folders" --notes "Custom RSS subscription folders. Windows x64 build and tests passed. Source: $SourceCommit. Upstream: $UpstreamTag." --latest
+$existing = @(gh api "repos/$env:GITHUB_REPOSITORY/releases?per_page=100" | ConvertFrom-Json) | Where-Object tag_name -eq $ReleaseTag
+if ($existing) {
+    if (-not $existing.draft) { throw 'Refusing to modify an already published release' }
+} else {
+    gh release create $ReleaseTag --draft --repo $env:GITHUB_REPOSITORY --target $SourceCommit --title "qBittorrent $UpstreamTag + RSS folders" --notes "Custom RSS subscription folders. Windows x64 build and tests passed. Source: $SourceCommit. Upstream: $UpstreamTag."
+}
+# Draft assets can be retried after interrupted uploads; published assets remain immutable.
+gh release upload $ReleaseTag $archive custom-update.json --clobber --repo $env:GITHUB_REPOSITORY
+gh release edit $ReleaseTag --draft=false --latest --repo $env:GITHUB_REPOSITORY
