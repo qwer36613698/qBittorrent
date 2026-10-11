@@ -24,7 +24,12 @@ $manifest = [ordered]@{
 }
 $manifest | ConvertTo-Json | Set-Content "$package/custom-build.json" -Encoding utf8
 $env:QT_PLUGIN_PATH = "$package/plugins"
-& "$package/qbittorrent.exe" --version
+$probe = Start-Process "$package/qbittorrent.exe" -ArgumentList '--custom-build-check' -WindowStyle Hidden -PassThru
+if (-not $probe.WaitForExit(15000)) {
+    & taskkill.exe /PID $probe.Id /T /F | Out-Null
+    throw 'Packaged application check timed out'
+}
+if ($probe.ExitCode -ne 0) { throw "Packaged application check failed: $($probe.ExitCode)" }
 $archive = Join-Path $PWD 'qbittorrent-custom-windows-x64.zip'
 Compress-Archive -Path "$package/*" -DestinationPath $archive -Force
 $manifest.archive = [IO.Path]::GetFileName($archive)

@@ -51,6 +51,7 @@
 
 #ifndef DISABLE_GUI
 // GUI-only includes
+#include <QApplication>
 #include <QFont>
 #include <QMessageBox>
 #include <QPainter>
@@ -175,6 +176,14 @@ namespace
 // Main
 int main(int argc, char *argv[])
 {
+#if defined(Q_OS_WIN) && !defined(DISABLE_GUI)
+    // Verify the packaged Qt runtime without opening or migrating a user profile.
+    if ((argc == 2) && (QString::fromLocal8Bit(argv[1]) == u"--custom-build-check"_s))
+    {
+        const QApplication probe(argc, argv);
+        return EXIT_SUCCESS;
+    }
+#endif
 #ifdef DISABLE_GUI
     setvbuf(stdout, nullptr, _IONBF, 0);
 #endif
