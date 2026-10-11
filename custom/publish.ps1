@@ -6,7 +6,7 @@ $PSNativeCommandUseErrorActionPreference = $true
 $package = Join-Path $PWD 'custom-package'
 New-Item -ItemType Directory -Path $package -Force | Out-Null
 Copy-Item build/qbittorrent.exe,dist/windows/qt.conf -Destination $package
-& "$env:Qt_ROOT_DIR/bin/windeployqt.exe" --release --compiler-runtime --no-translations --dir $package "$package/qbittorrent.exe"
+& "$env:Qt_ROOT_DIR/bin/windeployqt.exe" --release --compiler-runtime --dir $package "$package/qbittorrent.exe"
 # Deploy the app-local Microsoft runtime as well, without running an installer.
 $crt = Get-ChildItem "$env:VCToolsRedistDir/x64" -Directory -Filter 'Microsoft.VC*.CRT' | Select-Object -First 1
 if (-not $crt) { throw 'MSVC app-local runtime not found' }
