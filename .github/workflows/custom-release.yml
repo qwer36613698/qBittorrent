@@ -124,9 +124,18 @@ jobs:
         with:
           version: "6.10.1"
           arch: ${{ matrix.config.qt_arch }}
-          archives: qtbase qtsvg qttools
+          archives: qtbase qtsvg qttools qtdeclarative
           modules: qtimageformats
           cache: true
+
+      - name: Verify Qt build tools
+        if: steps.prepare.outputs.build == 'true'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          dumpbin /DEPENDENTS "$env:Qt_ROOT_DIR/bin/lupdate.exe"
+          & "$env:Qt_ROOT_DIR/bin/lupdate.exe" -version
+          & "$env:Qt_ROOT_DIR/bin/lrelease.exe" -version
 
       - if: steps.prepare.outputs.build == 'true'
         name: Install libtorrent
